@@ -1,5 +1,6 @@
 import { getPredictionStatus } from '@/lib/replicate-client'
-import type { PredictionStatus } from '@/lib/types'
+import { PollQueryParamsSchema, PredictionResultSchema } from '@/lib/schemas'
+import { ValidationError, formatErrorResponse } from '@/lib/errors'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
@@ -9,16 +10,19 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
 
-    if (!id || typeof id !== 'string') {
-      console.warn('[POLL] Missing prediction ID')
-      return NextResponse.json(
-        { error: 'Missing prediction ID' },
-        { status: 400 }
-      )
+    // Validate query params
+    const result = PollQueryParamsSchema.safeParse({ id })
+    if (!result.success) {
+      const validationError = ValidationError.fromZodError(result.error)
+      console.warn('[POLL] Validation error:', validationError.message)
+      const { statusCode, body: errorBody } = formatErrorResponse(validationError)
+      return NextResponse.json(errorBody, { status: statusCode })
     }
 
-    console.log('[POLL] Checking status for prediction:', id)
-    const prediction = await getPredictionStatus(id)
+    const { id: predictionId } = result.data
+
+    console.log('[POLL] Checking status for prediction:', predictionId)
+    const prediction = await getPredictionStatus(predictionId)
     console.log('[POLL] Prediction status:', prediction.status)
 
     if (prediction.status === 'succeeded') {
@@ -30,21 +34,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       console.log('[POLL] Still processing... status:', prediction.status)
     }
 
-    const response: PredictionStatus = {
+    // Validate response before sending
+    const response = PredictionResultSchema.parse({
       status: prediction.status,
       output: prediction.output,
       error: prediction.error,
-    }
+    })
 
     return NextResponse.json(response)
   } catch (error) {
     console.error('[POLL] ❌ Poll error:', error)
-    const errorMessage =
-      error instanceof Error ? error.message : 'Failed to get prediction status'
-    console.error('[POLL] Error message:', errorMessage)
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    )
+    const { statusCode, body: errorBody } = formatErrorResponse(error)
+    return NextResponse.json(errorBody, { status: statusCode })
   }
 }

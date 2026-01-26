@@ -1,4 +1,4 @@
-import type { Mood } from './types'
+import type { Mood } from './schemas'
 
 interface MoodConfig {
   descriptors: string[]

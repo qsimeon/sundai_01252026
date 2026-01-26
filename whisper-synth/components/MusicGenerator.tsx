@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import type { Mood } from '@/lib/types'
+import type { Mood } from '@/lib/schemas'
+import { GenerationRequestSchema, GenerationResponseSchema, PredictionResultSchema } from '@/lib/schemas'
 import { AudioPlayer } from './AudioPlayer'
 
 type GenerationStep = 'idle' | 'speech' | 'instrument' | 'complete'
@@ -25,11 +26,19 @@ export function MusicGenerator() {
     console.log('[CLIENT] Starting generation with mood:', mood)
 
     try {
+      // Pre-validate request before sending
+      const requestBody = { lyrics, mood }
+      const validationResult = GenerationRequestSchema.safeParse(requestBody)
+      if (!validationResult.success) {
+        const errors = validationResult.error.issues.map((i) => i.message).join(', ')
+        throw new Error(`Validation error: ${errors}`)
+      }
+
       console.log('[CLIENT] Calling /api/generate-music...')
       const res = await fetch('/api/generate-music', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lyrics, mood }),
+        body: JSON.stringify(validationResult.data),
       })
 
       const data = await res.json()
@@ -39,11 +48,17 @@ export function MusicGenerator() {
         throw new Error(data.error || 'Generation failed')
       }
 
-      setSpeechUrl(data.speechUrl)
+      // Validate API response
+      const responseValidation = GenerationResponseSchema.safeParse(data)
+      if (!responseValidation.success) {
+        throw new Error('Invalid response from server')
+      }
+
+      setSpeechUrl(responseValidation.data.speechUrl)
       console.log('[CLIENT] Speech generated, now polling for instrumental...')
       setCurrentStep('instrument')
 
-      const instrumentalUrl = await pollForCompletion(data.predictionId)
+      const instrumentalUrl = await pollForCompletion(responseValidation.data.predictionId)
       setInstrumentalUrl(instrumentalUrl)
       console.log('[CLIENT] ✓ Generation complete!')
       setCurrentStep('complete')
@@ -68,16 +83,26 @@ export function MusicGenerator() {
         const res = await fetch(`/api/poll-prediction?id=${predictionId}`)
         const data = await res.json()
 
-        console.log('[CLIENT] Poll response status:', data.status)
+        // Validate response schema
+        const validationResult = PredictionResultSchema.safeParse(data)
+        if (!validationResult.success) {
+          throw new Error('Invalid polling response from server')
+        }
 
-        if (data.status === 'succeeded') {
+        const result = validationResult.data
+        console.log('[CLIENT] Poll response status:', result.status)
+
+        if (result.status === 'succeeded') {
           console.log('[CLIENT] ✓ Prediction succeeded!')
-          const output = Array.isArray(data.output) ? data.output[0] : data.output
+          const output = Array.isArray(result.output) ? result.output[0] : result.output
+          if (!output) {
+            throw new Error('No output received from prediction')
+          }
           console.log('[CLIENT] Output URL:', output)
           return output
-        } else if (data.status === 'failed') {
-          console.error('[CLIENT] ❌ Prediction failed:', data.error)
-          throw new Error(data.error || 'Generation failed')
+        } else if (result.status === 'failed') {
+          console.error('[CLIENT] ❌ Prediction failed:', result.error)
+          throw new Error(result.error || 'Generation failed')
         }
 
         console.log('[CLIENT] Still processing, waiting 2 seconds...')
