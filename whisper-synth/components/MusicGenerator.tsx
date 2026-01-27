@@ -5,13 +5,12 @@ import type { Mood } from '@/lib/schemas'
 import { GenerationRequestSchema, GenerationResponseSchema, PredictionResultSchema } from '@/lib/schemas'
 import { AudioPlayer } from './AudioPlayer'
 
-type GenerationStep = 'idle' | 'speech' | 'instrument' | 'complete'
+type GenerationStep = 'idle' | 'generating' | 'complete'
 
 export function MusicGenerator() {
   const [lyrics, setLyrics] = useState('')
   const [mood, setMood] = useState<Mood>('eerie')
   const [currentStep, setCurrentStep] = useState<GenerationStep>('idle')
-  const [speechUrl, setSpeechUrl] = useState<string | null>(null)
   const [instrumentalUrl, setInstrumentalUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -19,8 +18,7 @@ export function MusicGenerator() {
   async function handleGenerate() {
     setError(null)
     setIsLoading(true)
-    setCurrentStep('speech')
-    setSpeechUrl(null)
+    setCurrentStep('generating')
     setInstrumentalUrl(null)
 
     console.log('[CLIENT] Starting generation with mood:', mood)
@@ -54,10 +52,7 @@ export function MusicGenerator() {
         throw new Error('Invalid response from server')
       }
 
-      setSpeechUrl(responseValidation.data.speechUrl)
-      console.log('[CLIENT] Speech generated, now polling for instrumental...')
-      setCurrentStep('instrument')
-
+      console.log('[CLIENT] Music generation started, polling for completion...')
       const instrumentalUrl = await pollForCompletion(responseValidation.data.predictionId)
       setInstrumentalUrl(instrumentalUrl)
       console.log('[CLIENT] ✓ Generation complete!')
@@ -125,10 +120,8 @@ export function MusicGenerator() {
 
   const getStepLabel = () => {
     switch (currentStep) {
-      case 'speech':
-        return 'Converting text to speech...'
-      case 'instrument':
-        return 'Transforming to haunting instrumental...'
+      case 'generating':
+        return 'Creating haunting instrumental music...'
       case 'complete':
         return 'Complete'
       default:
@@ -197,7 +190,7 @@ export function MusicGenerator() {
         )}
 
         {/* Progress Section */}
-        {currentStep !== 'idle' && !instrumentalUrl && (
+        {currentStep === 'generating' && (
           <div className="space-y-4 text-center py-8">
             <div className="text-neutral-400 text-sm space-y-2">
               {getStepLabel() && (
@@ -227,21 +220,9 @@ export function MusicGenerator() {
 
             <AudioPlayer url={instrumentalUrl} label="Final Instrumental" />
 
-            {speechUrl && (
-              <details className="group">
-                <summary className="cursor-pointer text-neutral-500 hover:text-neutral-400 text-xs uppercase tracking-wider py-2">
-                  ► Show original speech
-                </summary>
-                <div className="mt-4 pt-4 border-t border-neutral-800">
-                  <AudioPlayer url={speechUrl} label="Original Speech (TTS)" />
-                </div>
-              </details>
-            )}
-
             <button
               onClick={() => {
                 setInstrumentalUrl(null)
-                setSpeechUrl(null)
                 setLyrics('')
                 setCurrentStep('idle')
               }}

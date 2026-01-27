@@ -1,4 +1,4 @@
-import { generateSpeech, generateInstrumentalMusic } from '@/lib/replicate-client'
+import { generateInstrumentalMusic } from '@/lib/replicate-client'
 import { createVocalToInstrumentPrompt } from '@/lib/prompt-engineer'
 import { GenerationRequestSchema, GenerationResponseSchema } from '@/lib/schemas'
 import { ValidationError, formatErrorResponse } from '@/lib/errors'
@@ -23,19 +23,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const { lyrics, mood } = result.data
 
-    console.log('[API] Step 1: Generating speech from text...')
-    const { dataUrl: speechUrl, duration: speechDuration } = await generateSpeech(lyrics)
-    console.log('[API] ✓ Speech generated successfully, duration:', speechDuration, 'seconds')
-
-    console.log('[API] Step 2: Generating instrumental music...')
+    console.log('[API] Step 1: Creating music prompt...')
     const prompt = createVocalToInstrumentPrompt(lyrics, mood)
     console.log('[API] Prompt created:', prompt.substring(0, 100) + '...')
-    const prediction = await generateInstrumentalMusic(prompt, speechUrl, speechDuration)
-    console.log('[API] ✓ Music generation prediction created with duration:', speechDuration, 'seconds')
+
+    console.log('[API] Step 2: Generating instrumental music from text...')
+    const prediction = await generateInstrumentalMusic(prompt, lyrics)
+    console.log('[API] ✓ Music generation prediction created')
 
     // Validate response before sending
     const response = GenerationResponseSchema.parse({
-      speechUrl,
       predictionId: prediction.id,
       status: 'processing',
     })

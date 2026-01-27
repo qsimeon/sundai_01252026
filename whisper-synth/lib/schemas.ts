@@ -11,12 +11,7 @@ export const MoodSchema = z
 
 export type Mood = z.infer<typeof MoodSchema>
 
-export const AudioUrlSchema = z
-  .string()
-  .min(1, 'Audio URL cannot be empty')
-  .describe('URL pointing to audio file')
 
-export type AudioUrl = z.infer<typeof AudioUrlSchema>
 
 export const PredictionIdSchema = z
   .string()
@@ -67,7 +62,6 @@ export type PollQueryParams = z.infer<typeof PollQueryParamsSchema>
  */
 
 export const GenerationResponseSchema = z.object({
-  speechUrl: AudioUrlSchema,
   predictionId: PredictionIdSchema,
   status: z.literal('processing'),
 })
@@ -112,29 +106,7 @@ export const FileOutputSchema = z.object({
 
 export type FileOutput = z.infer<typeof FileOutputSchema>
 
-/**
- * Audio URL output - can be a string, array of strings, FileOutput, or object with audio properties
- * Handles all possible Replicate TTS/audio model outputs
- */
-export const ReplicateAudioOutputSchema = z
-  .union([
-    // Direct string URL
-    z.string().describe('Direct URL string'),
-    // Array of URLs
-    z.array(z.string()).describe('Array of URL strings'),
-    // FileOutput object from Replicate SDK
-    FileOutputSchema,
-    // Object with audio properties (fallback for other models)
-    z.object({
-      audio_out: z.string().optional(),
-      audio: z.string().optional(),
-      output: z.string().optional(),
-      url: z.string().optional(),
-    }).describe('Object with audio URL in one of the common properties'),
-  ])
-  .describe('Audio output from Replicate TTS models - handles string URLs, arrays, and FileOutput objects')
 
-export type ReplicateAudioOutput = z.infer<typeof ReplicateAudioOutputSchema>
 
 /**
  * Generic Replicate output (for music/other outputs that might be different format)
@@ -145,21 +117,7 @@ export const ReplicateRawOutputSchema = z
 
 export type ReplicateRawOutput = z.infer<typeof ReplicateRawOutputSchema>
 
-export const MiniMaxInputSchema = z.object({
-  text: z.string().min(1),
-  voice_id: z.string().min(1),
-})
 
-export type MiniMaxInput = z.infer<typeof MiniMaxInputSchema>
-
-export const MiniMaxPredictionSchema = z.object({
-  id: PredictionIdSchema,
-  status: PredictionStatusEnum,
-  output: z.union([z.null(), z.string(), z.array(z.string())]),
-  error: z.string().nullable(),
-})
-
-export type MiniMaxPrediction = z.infer<typeof MiniMaxPredictionSchema>
 
 export const MusicGenInputSchema = z.object({
   prompt: z.string().min(1),
