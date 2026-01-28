@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { Mood } from '@/lib/schemas'
-import { GenerationRequestSchema, GenerationResponseSchema, PredictionResultSchema } from '@/lib/schemas'
+import { GenerationRequestSchema, GenerationResponseSchema } from '@/lib/schemas'
 import { AudioPlayer } from './AudioPlayer'
 
 type GenerationStep = 'idle' | 'generating' | 'complete'
@@ -52,11 +52,36 @@ export function MusicGenerator() {
         throw new Error('Invalid response from server')
       }
 
-      console.log('[CLIENT] Music generation started, polling for completion...')
-      const instrumentalUrl = await pollForCompletion(responseValidation.data.predictionId)
-      setInstrumentalUrl(instrumentalUrl)
-      console.log('[CLIENT] ✓ Generation complete!')
-      setCurrentStep('complete')
+      // Handle synchronous response (either completed immediately)
+      const responseData = responseValidation.data
+      if (responseData.status === 'completed') {
+        console.log('[CLIENT] ✓ Generation completed immediately!')
+        setInstrumentalUrl(responseData.instrumentalUrl)
+        setCurrentStep('complete')
+      } else if (responseData.status === 'processing') {
+        console.log('[CLIENT] Generation in progress, waiting for completion...')
+        // Wait a bit then check again once (simple retry)
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        try {
+          const checkRes = await fetch(`/api/poll-prediction?id=${responseData.predictionId}`)
+          const checkData = await checkRes.json()
+          if (checkData.status === 'succeeded') {
+            const output = Array.isArray(checkData.output) ? checkData.output[0] : checkData.output
+            setInstrumentalUrl(output)
+            setCurrentStep('complete')
+          } else if (checkData.status === 'failed') {
+            throw new Error(checkData.error || 'Generation failed')
+          } else {
+            // Still processing, continue waiting
+            setTimeout(() => handleGenerate(), 10000)
+          }
+        } catch (error) {
+          console.error('[CLIENT] Error checking completion:', error)
+          throw error
+        }
+      } else {
+        throw new Error('Unexpected response status: ' + (responseData as any).status)
+      }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Generation failed'
       console.error('[CLIENT] ❌ Error:', errorMsg)
@@ -67,56 +92,7 @@ export function MusicGenerator() {
     }
   }
 
-  async function pollForCompletion(predictionId: string): Promise<string> {
-    console.log('[CLIENT] Polling for prediction:', predictionId)
-    let pollCount = 0
-    const maxRetries = 180
-
-    while (pollCount < maxRetries) {
-      try {
-        console.log(`[CLIENT] Poll attempt ${pollCount + 1}/${maxRetries}...`)
-        const res = await fetch(`/api/poll-prediction?id=${predictionId}`)
-        const data = await res.json()
-
-        // Validate response schema
-        const validationResult = PredictionResultSchema.safeParse(data)
-        if (!validationResult.success) {
-          throw new Error('Invalid polling response from server')
-        }
-
-        const result = validationResult.data
-        console.log('[CLIENT] Poll response status:', result.status)
-
-        if (result.status === 'succeeded') {
-          console.log('[CLIENT] ✓ Prediction succeeded!')
-          const output = Array.isArray(result.output) ? result.output[0] : result.output
-          if (!output) {
-            throw new Error('No output received from prediction')
-          }
-          console.log('[CLIENT] Output URL:', output)
-          return output
-        } else if (result.status === 'failed') {
-          console.error('[CLIENT] ❌ Prediction failed:', result.error)
-          throw new Error(result.error || 'Generation failed')
-        }
-
-        console.log('[CLIENT] Still processing, waiting 2 seconds...')
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-        pollCount++
-      } catch (err) {
-        if (err instanceof Error && err.message.includes('Generation failed')) {
-          throw err
-        }
-        pollCount++
-        if (pollCount >= maxRetries) {
-          throw new Error('Generation timed out after 6 minutes')
-        }
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-      }
-    }
-
-    throw new Error('Generation timed out')
-  }
+  
 
   const getStepLabel = () => {
     switch (currentStep) {

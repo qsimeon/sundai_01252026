@@ -27,17 +27,35 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const prompt = createVocalToInstrumentPrompt(lyrics, mood)
     console.log('[API] Prompt created:', prompt.substring(0, 100) + '...')
 
-    console.log('[API] Step 2: Generating instrumental music from text...')
-    const prediction = await generateInstrumentalMusic(prompt, lyrics)
+console.log('[API] Step 2: Generating instrumental music from text...')
+    const musicPrompt = createVocalToInstrumentPrompt(lyrics, mood)
+    console.log('[API] Prompt created:', musicPrompt.substring(0, 100) + '...')
+    const prediction = await generateInstrumentalMusic(musicPrompt, lyrics)
     console.log('[API] ✓ Music generation prediction created')
 
-    // Validate response before sending
+    // For synchronous wait, check if prediction completed immediately
+    if (prediction.status === 'succeeded') {
+      console.log('[API] ✓ Prediction completed immediately!')
+      return NextResponse.json({
+        predictionId: prediction.id,
+        status: 'completed',
+        instrumentalUrl: Array.isArray(prediction.output) ? prediction.output[0] : prediction.output,
+      })
+    } else if (prediction.status === 'failed') {
+      console.error('[API] ❌ Prediction failed:', prediction.error)
+      return NextResponse.json(
+        { error: prediction.error || 'Generation failed' },
+        { status: 500 }
+      )
+    }
+
+    // Validate response before sending (processing state for client compatibility)
     const response = GenerationResponseSchema.parse({
       predictionId: prediction.id,
       status: 'processing',
     })
 
-    console.log('[API] ✓ Returning response to client')
+    console.log('[API] ✓ Returning prediction ID to client (waiting for completion)')
     return NextResponse.json(response)
   } catch (error) {
     console.error('[API] ❌ Generation error:', error)

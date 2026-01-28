@@ -61,10 +61,17 @@ export type PollQueryParams = z.infer<typeof PollQueryParamsSchema>
  * Request/response schemas for our APIs
  */
 
-export const GenerationResponseSchema = z.object({
-  predictionId: PredictionIdSchema,
-  status: z.literal('processing'),
-})
+export const GenerationResponseSchema = z.union([
+  z.object({
+    predictionId: PredictionIdSchema,
+    status: z.literal('processing'),
+  }),
+  z.object({
+    predictionId: PredictionIdSchema,
+    status: z.literal('completed'),
+    instrumentalUrl: z.string().nullable(),
+  })
+])
 
 export type GenerationResponse = z.infer<typeof GenerationResponseSchema>
 

@@ -26,34 +26,14 @@ const MOODS: Record<Mood, MoodConfig> = {
 
 export function createVocalToInstrumentPrompt(lyrics: string, mood: Mood = 'eerie'): string {
   const config = MOODS[mood]
-  const wordCount = lyrics.trim().split(/\s+/).length
-  const targetDuration = Math.max(15, Math.min(180, wordCount * 2.5))
 
   return `
-Dark ambient synthesizer music in the style of Eulogy from Stranger Things.
+Eulogy-style dark ambient music inspired by: "${lyrics}"
 
-User text: "${lyrics}"
-
-Create ${config.descriptors.join(', ')} atmospheric instrumental music.
-Music should be ${targetDuration} seconds long with ${config.tempo}.
-${config.intensity} progression with emotional depth.
-
-Instrumentation:
-- Haunting synthesizer melodies with ethereal pads
-- Wordless vocal-like tones and atmospheric textures  
-- Deep resonant bass frequencies
-- Heavy reverb and delay effects
-- No drums or percussion
-
-Musical structure:
-- Slow, evolving soundscapes that breathe and swell
-- Melodic fragments that suggest the emotional contour of the text
-- Dynamic range from subtle whispers to powerful crescendos
-- Organic, analog synthesizer warmth with digital precision
-
-Mood: ${config.descriptors.join(', ')}
-Tempo: ${config.tempo}
-Duration: ${targetDuration} seconds
-Style: Dark ambient, cinematic, haunting
+${config.descriptors.join(', ')} atmosphere.
+Haunting synthesizers with ethereal vocal-like tones.
+Heavy reverb, no drums, pure atmospheric synthesis.
+${config.intensity} emotional progression.
+Style: Dark ambient, cinematic, haunting from Stranger Things.
   `.trim()
 }
