@@ -11,16 +11,11 @@ const replicate = new Replicate({
 })
 
 /**
- * Calculate duration based on text length for direct text-to-music generation
- * Rough estimate: ~2 seconds per word for atmospheric music
+ * Fixed 10-second duration for all generations
+ * Consistent, predictable generation times
  */
-function estimateDurationFromText(text: string): number {
-  const words = text.trim().split(/\s+/).length
-  const secondsPerWord = 2.5 // Atmospheric music pacing
-  const estimatedDuration = Math.ceil(words * secondsPerWord)
-  
-  // Clamp to reasonable bounds
-  return Math.max(15, Math.min(180, estimatedDuration)) // 15s to 3min
+function getFixedDuration(): number {
+  return 10 // Fixed 10 seconds for all generations
 }
 
 export async function generateInstrumentalMusic(
@@ -32,8 +27,8 @@ export async function generateInstrumentalMusic(
     console.log('[REPLICATE] Prompt:', prompt.substring(0, 100) + '...')
     console.log('[REPLICATE] User text:', text.substring(0, 50) + '...')
 
-    // Estimate duration from user text instead of speech
-    const duration = estimateDurationFromText(text)
+    // Fixed 10-second duration for all generations
+    const duration = getFixedDuration()
 
     const inputObj: Record<string, unknown> = {
       prompt: prompt,
@@ -47,7 +42,7 @@ export async function generateInstrumentalMusic(
       normalization_strategy: 'loudness',
     }
 
-    console.log('[REPLICATE] Estimated duration:', duration, 'seconds')
+    console.log('[REPLICATE] Fixed duration:', duration, 'seconds')
     console.log('[REPLICATE] Text-to-music generation (no audio conditioning)')
 
     // Validate the complete input object
